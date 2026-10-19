@@ -14,6 +14,13 @@ abstract interface class AuthRepository {
     required String password,
   });
 
+  /// Registers a new user with [email], [password], and optional [displayName].
+  Future<Either<Failure, User>> register({
+    required String email,
+    required String password,
+    String? displayName,
+  });
+
   /// Returns the cached [User] if a live session exists, else [None].
   Future<Either<Failure, User?>> getCurrentUser();
 

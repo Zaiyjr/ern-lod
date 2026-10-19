@@ -44,6 +44,28 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, User>> register({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    try {
+      final UserModel user = await _remote.register(
+        email: email,
+        password: password,
+        displayName: displayName,
+      );
+      return Right(user.toEntity());
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(UnexpectedFailure());
+    }
+  }
+
+  @override
   Future<Either<Failure, User?>> getCurrentUser() async {
     try {
       final UserModel user = await _local.getLastSession();

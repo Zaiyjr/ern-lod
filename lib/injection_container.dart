@@ -5,6 +5,7 @@ import 'features/auth/data/datasources/auth_remote_data_source.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/usecases/check_auth_status.dart';
+import 'features/auth/domain/usecases/register.dart';
 import 'features/auth/domain/usecases/sign_in.dart';
 import 'features/auth/domain/usecases/sign_out.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
@@ -31,6 +32,7 @@ Future<void> initInjection() async {
 
   // Use cases
   sl.registerLazySingleton(() => SignIn(sl()));
+  sl.registerLazySingleton(() => Register(sl()));
   sl.registerLazySingleton(() => CheckAuthStatus(sl()));
   sl.registerLazySingleton(() => SignOut(sl()));
 
@@ -38,6 +40,7 @@ Future<void> initInjection() async {
   sl.registerFactory(
     () => AuthBloc(
       signIn: sl(),
+      register: sl(),
       checkAuthStatus: sl(),
       signOut: sl(),
     ),

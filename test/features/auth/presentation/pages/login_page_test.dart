@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ride_booking/features/auth/domain/usecases/check_auth_status.dart';
+import 'package:ride_booking/features/auth/domain/usecases/register.dart';
 import 'package:ride_booking/features/auth/domain/usecases/sign_in.dart';
 import 'package:ride_booking/features/auth/domain/usecases/sign_out.dart';
 import 'package:ride_booking/features/auth/presentation/bloc/auth_bloc.dart';
@@ -15,6 +16,7 @@ void main() {
     final repository = FakeAuthRepository();
     final bloc = AuthBloc(
       signIn: SignIn(repository),
+      register: Register(repository),
       checkAuthStatus: CheckAuthStatus(repository),
       signOut: SignOut(repository),
     );

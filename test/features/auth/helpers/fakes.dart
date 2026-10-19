@@ -13,14 +13,18 @@ class FakeAuthRepository implements AuthRepository {
   FakeAuthRepository({
     this.user,
     this.signInFailure,
+    this.registerFailure,
     this.cacheFailure,
   });
 
-  /// User returned by a successful [signIn]/[getCurrentUser].
+  /// User returned by a successful [signIn]/[register]/[getCurrentUser].
   final User? user;
 
   /// When non-null, [signIn] returns this failure instead of a user.
   final Failure? signInFailure;
+
+  /// When non-null, [register] returns this failure instead of a user.
+  final Failure? registerFailure;
 
   /// When non-null, [cacheSession] returns this failure.
   final Failure? cacheFailure;
@@ -34,6 +38,17 @@ class FakeAuthRepository implements AuthRepository {
     required String password,
   }) async {
     final failure = signInFailure;
+    if (failure != null) return Left(failure);
+    return Right(user!);
+  }
+
+  @override
+  Future<Either<Failure, User>> register({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    final failure = registerFailure;
     if (failure != null) return Left(failure);
     return Right(user!);
   }
@@ -69,6 +84,17 @@ class FakeRemoteDataSource implements AuthRemoteDataSource {
   Future<UserModel> signIn({
     required String email,
     required String password,
+  }) async {
+    final thrown = error;
+    if (thrown != null) throw thrown;
+    return user!;
+  }
+
+  @override
+  Future<UserModel> register({
+    required String email,
+    required String password,
+    String? displayName,
   }) async {
     final thrown = error;
     if (thrown != null) throw thrown;

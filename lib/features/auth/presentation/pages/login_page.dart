@@ -9,7 +9,9 @@ import '../bloc/auth_bloc.dart';
 /// Kept as a plain [StatefulWidget] + `context.read`: the Bloc is the
 /// state holder, so no local state beyond the form fields is needed.
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.onToggleMode});
+
+  final VoidCallback? onToggleMode;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -129,6 +131,24 @@ class _LoginPageState extends State<LoginPage> {
                           ],
                         );
                       },
+                    ),
+                    const SizedBox(height: 24),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Text(
+                          "Don't have an account? ",
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: widget.onToggleMode,
+                          child: const Text('Sign up'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
