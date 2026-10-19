@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ride_booking/core/error/failures.dart';
 import 'package:ride_booking/features/auth/domain/entities/user.dart';
 import 'package:ride_booking/features/auth/domain/usecases/check_auth_status.dart';
+import 'package:ride_booking/features/auth/domain/usecases/register.dart';
 import 'package:ride_booking/features/auth/domain/usecases/sign_in.dart';
 import 'package:ride_booking/features/auth/domain/usecases/sign_out.dart';
 import 'package:ride_booking/features/auth/presentation/bloc/auth_bloc.dart';
@@ -12,10 +13,19 @@ import '../../helpers/fakes.dart';
 void main() {
   const user = User(id: '42', email: 'rider@example.com');
 
-  AuthBloc buildBloc({User? user, Failure? signInFailure}) {
-    final repository = FakeAuthRepository(user: user, signInFailure: signInFailure);
+  AuthBloc buildBloc({
+    User? user,
+    Failure? signInFailure,
+    Failure? registerFailure,
+  }) {
+    final repository = FakeAuthRepository(
+      user: user,
+      signInFailure: signInFailure,
+      registerFailure: registerFailure,
+    );
     return AuthBloc(
       signIn: SignIn(repository),
+      register: Register(repository),
       checkAuthStatus: CheckAuthStatus(repository),
       signOut: SignOut(repository),
     );

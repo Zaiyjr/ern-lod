@@ -6,7 +6,7 @@ import 'package:ride_booking/core/error/failures.dart';
 import 'package:ride_booking/features/auth/data/models/user_model.dart';
 import 'package:ride_booking/features/auth/data/repositories/auth_repository_impl.dart';
 
-import '../helpers/fakes.dart';
+import '../../helpers/fakes.dart';
 
 void main() {
   late FakeRemoteDataSource remote;
@@ -116,7 +116,7 @@ void main() {
 
       expect(result.isRight(), isTrue);
       final user = result.getOrElse(() => throw StateError('expected Right'));
-      expect(user.id, '42');
+      expect(user!.id, '42');
     });
 
     test('returns Right(null) when no session is cached', () async {

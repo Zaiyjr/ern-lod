@@ -3,14 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/auth/presentation/pages/auth_page.dart';
 import 'features/auth/presentation/pages/home_page.dart';
-import 'features/auth/presentation/pages/login_page.dart';
 import 'injection_container.dart';
 
 /// Root widget: provides [AuthBloc] and routes on its state.
 ///
 /// Auth routing is state-driven (`AuthAuthenticated` → [HomePage],
-/// otherwise [LoginPage]) so navigation can never desync from the
+/// otherwise [AuthPage]) so navigation can never desync from the
 /// session state.
 class RideBookingApp extends StatefulWidget {
   const RideBookingApp({super.key});
@@ -46,7 +46,7 @@ class _RideBookingAppState extends State<RideBookingApp> {
           builder: (context, state) => switch (state) {
             AuthAuthenticated() => const HomePage(),
             AuthInitial() || AuthLoading() => const _SplashView(),
-            _ => const LoginPage(),
+            _ => const AuthPage(),
           },
         ),
       ),
