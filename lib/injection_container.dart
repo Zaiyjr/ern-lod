@@ -1,5 +1,7 @@
 import 'package:get_it/get_it.dart';
+import 'package:http/http.dart' as http;
 
+import 'core/network/mock_http_client.dart';
 import 'features/auth/data/datasources/auth_local_data_source.dart';
 import 'features/auth/data/datasources/auth_remote_data_source.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
@@ -19,8 +21,9 @@ final GetIt sl = GetIt.instance;
 
 Future<void> initInjection() async {
   // Datasources
+  sl.registerLazySingleton<http.Client>(() => MockHttpClient());
   sl.registerLazySingleton<AuthRemoteDataSource>(
-      () => AuthRemoteDataSourceImpl());
+      () => AuthRemoteDataSourceImpl(client: sl<http.Client>()));
   sl.registerLazySingleton<AuthLocalDataSource>(
       () => AuthLocalDataSourceImpl());
 

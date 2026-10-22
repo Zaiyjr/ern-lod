@@ -12,6 +12,9 @@ abstract final class AppColors {
   static const accentSoft = Color(0xFF60A5FA);
   static const success = Color(0xFF34D399);
   static const danger = Color(0xFFFCA5A5);
+  static const warning = Color(0xFFFBBF24); // amber
+  static const textMuted = Color(0xFF8296B0);
+  static const tint = Color(0x292563EB); // accent @ 16%
   static const line = Color(0x14FFFFFF); // white @ 8%
   static const lineStrong = Color(0x24FFFFFF); // white @ 14%
 }
