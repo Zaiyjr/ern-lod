@@ -28,5 +28,8 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSLocationUsageDescription</key>
+	<string>Ride Booking needs your real-time location to set your pickup spot and show nearby drivers.</string>
 </dict>
 </plist>
+
