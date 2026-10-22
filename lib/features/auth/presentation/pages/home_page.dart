@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
-import '../../../ride/presentation/widgets/mock_map_background.dart';
+import '../../../ride/presentation/widgets/osm_map_background.dart';
 
 /// Screen 01 · Request a ride / Home Page
 /// Matches the mockup design board: Dark Map, Profile avatar, Search bar,
@@ -54,9 +54,9 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: AppColors.base,
       body: Stack(
         children: [
-          // 1. Vector dark city map background
+          // 1. Real interactive OpenStreetMap background
           const Positioned.fill(
-            child: MockMapBackground(),
+            child: OsmMapBackground(),
           ),
 
           // 2. Safe Area floating UI elements
