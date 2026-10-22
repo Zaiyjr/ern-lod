@@ -70,28 +70,16 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
         ),
       ),
       children: [
-        // 1. OpenStreetMap tile layer styled to dark mode
+        // 1. OpenStreetMap tile layer styled to crisp light cartography
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.example.ride_booking',
-          tileBuilder: (context, tileWidget, tile) {
-            // Invert and hue-adjust standard OSM tiles to match our sleek dark mockup theme
-            return ColorFiltered(
-              colorFilter: const ColorFilter.matrix(<double>[
-                -0.75, 0.00,  0.00, 0.0, 235,
-                 0.00, -0.75, 0.00, 0.0, 235,
-                 0.00, 0.00, -0.65, 0.0, 245,
-                 0.00, 0.00,  0.00, 1.0, 0,
-              ]),
-              child: tileWidget,
-            );
-          },
         ),
 
         // 2. Markers for Rider location and nearby driver cars
         MarkerLayer(
           markers: [
-            // Rider location pin
+            // Rider location pin with blue ambient glow
             Marker(
               point: widget.initialCenter,
               width: 50,
@@ -104,22 +92,22 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
                     height: 38,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.accent.withAlpha(55),
+                      color: AppColors.accent.withAlpha(50),
                     ),
                   ),
                   Container(
-                    width: 22,
-                    height: 22,
+                    width: 20,
+                    height: 20,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFFF1F5FB),
+                      color: Colors.white,
                       border: Border.all(
                         color: AppColors.accent,
                         width: 3.5,
                       ),
                       boxShadow: const [
                         BoxShadow(
-                          color: Colors.black45,
+                          color: Color(0x330F172A),
                           blurRadius: 8,
                           offset: Offset(0, 3),
                         ),
@@ -134,27 +122,23 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
             ..._mockDrivers.map(
               (pos) => Marker(
                 point: pos,
-                width: 32,
-                height: 32,
+                width: 34,
+                height: 34,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
+                    color: AppColors.brand,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: const Color(0xFF60A5FA),
-                      width: 1.5,
-                    ),
                     boxShadow: const [
                       BoxShadow(
-                        color: Colors.black54,
-                        blurRadius: 6,
-                        offset: Offset(0, 2),
+                        color: Color(0x260F172A),
+                        blurRadius: 8,
+                        offset: Offset(0, 3),
                       ),
                     ],
                   ),
                   child: const Icon(
                     Icons.directions_car_filled,
-                    color: Color(0xFF60A5FA),
+                    color: Colors.white,
                     size: 18,
                   ),
                 ),

@@ -112,24 +112,26 @@ class _HomePageState extends State<HomePage> {
                               ],
                             ),
                           ),
-                        ],
-                        child: Container(
+                        ],                        child: Container(
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            gradient: const LinearGradient(
-                              colors: [AppColors.accent, AppColors.accentSoft],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            color: AppColors.brand,
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x1F0F172A),
+                                blurRadius: 10,
+                                offset: Offset(0, 3),
+                              ),
+                            ],
                           ),
                           alignment: Alignment.center,
                           child: Text(
                             initial,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                               fontSize: 16,
                             ),
                           ),
@@ -140,30 +142,37 @@ class _HomePageState extends State<HomePage> {
                       // "Where to?" Searchbar
                       Expanded(
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(18),
                           onTap: () => _showDestinationSelected('Search location'),
                           child: Container(
-                            height: 52,
+                            height: 50,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             decoration: BoxDecoration(
-                              color: const Color(0xF2192134),
-                              borderRadius: BorderRadius.circular(16),
+                              color: Colors.white.withAlpha(245),
+                              borderRadius: BorderRadius.circular(18),
                               border: Border.all(color: AppColors.line),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x0D0F172A),
+                                  blurRadius: 16,
+                                  offset: Offset(0, 4),
+                                ),
+                              ],
                             ),
                             child: const Row(
                               children: [
                                 Icon(
                                   Icons.search,
-                                  color: AppColors.textMuted,
+                                  color: AppColors.accent,
                                   size: 22,
                                 ),
                                 SizedBox(width: 10),
                                 Text(
                                   'Where to?',
                                   style: TextStyle(
-                                    color: AppColors.textMuted,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textSecondary,
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
@@ -175,15 +184,22 @@ class _HomePageState extends State<HomePage> {
 
                       // Notification bell with badge dot
                       InkWell(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(16),
                         onTap: _showNotificationNotice,
                         child: Container(
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: const Color(0xF0192134),
-                            borderRadius: BorderRadius.circular(14),
+                            color: Colors.white.withAlpha(245),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: AppColors.line),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x0D0F172A),
+                                blurRadius: 12,
+                                offset: Offset(0, 3),
+                              ),
+                            ],
                           ),
                           child: const Stack(
                             alignment: Alignment.center,
@@ -212,14 +228,14 @@ class _HomePageState extends State<HomePage> {
                 // Ride type selector chips
                 Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   child: Row(
                     children: List.generate(_rideTypes.length, (idx) {
                       final selected = _selectedChipIndex == idx;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(999),
                           onTap: () {
                             setState(() {
                               _selectedChipIndex = idx;
@@ -227,27 +243,34 @@ class _HomePageState extends State<HomePage> {
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            height: 44,
+                            height: 42,
                             padding: const EdgeInsets.symmetric(horizontal: 18),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: selected
-                                  ? const Color(0x472563EB)
-                                  : const Color(0xEB192134),
-                              borderRadius: BorderRadius.circular(12),
+                              color: selected ? AppColors.brand : Colors.white,
+                              borderRadius: BorderRadius.circular(999),
                               border: Border.all(
                                 color: selected
-                                    ? const Color(0x8C60A5FA)
+                                    ? AppColors.brand
                                     : AppColors.line,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: selected
+                                      ? const Color(0x330F172A)
+                                      : const Color(0x080F172A),
+                                  blurRadius: selected ? 10 : 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
                             child: Text(
                               _rideTypes[idx],
                               style: TextStyle(
                                 color: selected
-                                    ? const Color(0xFFE8F1FF)
+                                    ? Colors.white
                                     : AppColors.textSecondary,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                                 fontSize: 13,
                               ),
                             ),
@@ -262,20 +285,17 @@ class _HomePageState extends State<HomePage> {
 
                 // 3. Bottom Sheet (Screen 01 sheet)
                 Container(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
                   decoration: const BoxDecoration(
-                    color: Color(0xFF192134),
+                    color: Colors.white,
                     borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(26),
-                    ),
-                    border: Border(
-                      top: BorderSide(color: Color(0x12FFFFFF)),
+                      top: Radius.circular(32),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Color(0x73040812),
-                        blurRadius: 48,
-                        offset: Offset(0, -24),
+                        color: Color(0x1F0F172A),
+                        blurRadius: 36,
+                        offset: Offset(0, -10),
                       ),
                     ],
                   ),
@@ -286,11 +306,11 @@ class _HomePageState extends State<HomePage> {
                       // Handle pill
                       Center(
                         child: Container(
-                          width: 40,
+                          width: 36,
                           height: 4,
-                          margin: const EdgeInsets.only(bottom: 14),
+                          margin: const EdgeInsets.only(bottom: 16),
                           decoration: BoxDecoration(
-                            color: const Color(0x33FFFFFF),
+                            color: const Color(0xFFCBD5E1),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -300,9 +320,9 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         'GOOD EVENING, ${firstName.toUpperCase()}',
                         style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 1.6,
+                          letterSpacing: 1.4,
                           color: AppColors.textMuted,
                         ),
                       ),
@@ -312,8 +332,9 @@ class _HomePageState extends State<HomePage> {
                       const Text(
                         'Where are you going?',
                         style: TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.4,
                           color: AppColors.textPrimary,
                         ),
                       ),
@@ -322,8 +343,8 @@ class _HomePageState extends State<HomePage> {
                       // Saved places rows (Home & Work)
                       Container(
                         decoration: BoxDecoration(
-                          color: const Color(0x06FFFFFF),
-                          borderRadius: BorderRadius.circular(16),
+                          color: AppColors.cardSubtle,
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: AppColors.line),
                         ),
                         child: Column(
@@ -362,14 +383,27 @@ class _HomePageState extends State<HomePage> {
 
                       // Drivers status note
                       const Center(
-                        child: Text(
-                          '4 drivers near Riverside Park',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textMuted,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle_rounded,
+                              color: AppColors.success,
+                              size: 15,
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              '4 drivers near Riverside Park',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+
                     ],
                   ),
                 ),
@@ -405,19 +439,27 @@ class _DestinationRow extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: AppColors.tint,
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.line),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x0A0F172A),
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  ),
+                ],
               ),
               child: Icon(
                 icon,
-                color: AppColors.accentSoft,
+                color: AppColors.accent,
                 size: 20,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,8 +467,8 @@ class _DestinationRow extends StatelessWidget {
                   Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                     ),
                   ),
@@ -435,16 +477,16 @@ class _DestinationRow extends StatelessWidget {
                     subtitle,
                     style: const TextStyle(
                       fontSize: 12.5,
-                      color: AppColors.textMuted,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
               ),
             ),
             const Icon(
-              Icons.chevron_right,
+              Icons.chevron_right_rounded,
               color: AppColors.textMuted,
-              size: 20,
+              size: 22,
             ),
           ],
         ),
@@ -452,3 +494,4 @@ class _DestinationRow extends StatelessWidget {
     );
   }
 }
+
