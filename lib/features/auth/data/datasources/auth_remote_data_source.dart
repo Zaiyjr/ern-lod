@@ -71,7 +71,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         body: jsonEncode({
           'email': email,
           'password': password,
-          if (displayName != null) 'displayName': displayName,
+          'displayName': ?displayName,
         }),
       );
     } on http.ClientException {
