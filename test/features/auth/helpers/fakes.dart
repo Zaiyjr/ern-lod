@@ -13,6 +13,7 @@ class FakeAuthRepository implements AuthRepository {
   FakeAuthRepository({
     this.user,
     this.signInFailure,
+    this.googleSignInFailure,
     this.registerFailure,
     this.cacheFailure,
   });
@@ -22,6 +23,9 @@ class FakeAuthRepository implements AuthRepository {
 
   /// When non-null, [signIn] returns this failure instead of a user.
   final Failure? signInFailure;
+
+  /// When non-null, [signInWithGoogle] returns this failure instead of a user.
+  final Failure? googleSignInFailure;
 
   /// When non-null, [register] returns this failure instead of a user.
   final Failure? registerFailure;
@@ -38,6 +42,14 @@ class FakeAuthRepository implements AuthRepository {
     required String password,
   }) async {
     final failure = signInFailure;
+    if (failure != null) return Left(failure);
+    return Right(user!);
+  }
+
+  @override
+  Future<Either<Failure, User>> signInWithGoogle(
+      {required String idToken}) async {
+    final failure = googleSignInFailure;
     if (failure != null) return Left(failure);
     return Right(user!);
   }
@@ -85,6 +97,13 @@ class FakeRemoteDataSource implements AuthRemoteDataSource {
     required String email,
     required String password,
   }) async {
+    final thrown = error;
+    if (thrown != null) throw thrown;
+    return user!;
+  }
+
+  @override
+  Future<UserModel> signInWithGoogle({required String idToken}) async {
     final thrown = error;
     if (thrown != null) throw thrown;
     return user!;

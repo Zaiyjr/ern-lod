@@ -31,6 +31,28 @@ void main() {
       expect(response.statusCode, 401);
     });
 
+    test('google sign-in exchanges an id token for a session', () async {
+      final response = await client.post(
+        Uri.parse('https://api.example.com/v1/auth/google'),
+        body: jsonEncode({'id_token': 'mock_google_id_token'}),
+      );
+
+      expect(response.statusCode, 200);
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      expect(body['email'], 'rider.google@gmail.com');
+      expect(body['display_name'], 'May Vong');
+      expect(body['token'], startsWith('mock_jwt_token_'));
+    });
+
+    test('google sign-in is 401 without an id token', () async {
+      final response = await client.post(
+        Uri.parse('https://api.example.com/v1/auth/google'),
+        body: jsonEncode({}),
+      );
+
+      expect(response.statusCode, 401);
+    });
+
     test('registers new user and allows login with new credentials', () async {
       final regResponse = await client.post(
         Uri.parse('https://api.example.com/v1/auth/register'),

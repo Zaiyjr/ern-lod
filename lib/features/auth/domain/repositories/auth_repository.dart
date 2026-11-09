@@ -14,6 +14,9 @@ abstract interface class AuthRepository {
     required String password,
   });
 
+  /// Signs in with a Google [idToken], returning the authenticated [User].
+  Future<Either<Failure, User>> signInWithGoogle({required String idToken});
+
   /// Registers a new user with [email], [password], and optional [displayName].
   Future<Either<Failure, User>> register({
     required String email,

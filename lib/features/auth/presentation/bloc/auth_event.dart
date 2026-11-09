@@ -19,6 +19,19 @@ class AuthSignInRequested extends AuthEvent {
   List<Object?> get props => [email, password];
 }
 
+/// User tapped "Continue with Google".
+///
+/// The id token defaults to the mock identity exchange value while the
+/// Google provider stands in for the real backend flow.
+class AuthGoogleSignInRequested extends AuthEvent {
+  const AuthGoogleSignInRequested({this.idToken = 'mock_google_id_token'});
+
+  final String idToken;
+
+  @override
+  List<Object?> get props => [idToken];
+}
+
 /// User submitted the register form.
 class AuthRegisterRequested extends AuthEvent {
   const AuthRegisterRequested({

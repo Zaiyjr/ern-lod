@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../constants/demo_account.dart';
+
 /// An HTTP Mock Client / Interceptor that intercepts REST API calls
 /// to `https://api.example.com` and provides realistic offline responses
 /// with realistic latency and error validation.
@@ -9,13 +11,15 @@ class MockHttpClient extends http.BaseClient {
 
   final Duration defaultDelay;
 
-  // In-memory registered user database for offline testing
+  // In-memory registered user database for offline testing.
+  // TODO(Slice 2 follow-up): replace with the real backend /api/v1/auth
+  // endpoints; keep route shapes stable until then.
   final Map<String, _MockUserEntry> _users = {
-    'alex@example.com': _MockUserEntry(
+    DemoAccount.email: _MockUserEntry(
       id: 'usr_mock_001',
-      email: 'alex@example.com',
-      password: 'password123',
-      displayName: 'Alex Rider',
+      email: DemoAccount.email,
+      password: DemoAccount.password,
+      displayName: DemoAccount.displayName,
       photoUrl: null,
     ),
   };
@@ -39,6 +43,11 @@ class MockHttpClient extends http.BaseClient {
       return _handleRegister(request);
     }
 
+    // Google sign-in endpoint (mock: resolves a canned Google identity)
+    if (path.endsWith('/v1/auth/google') && request.method == 'POST') {
+      return _handleGoogle(request);
+    }
+
     // Default 404 for unhandled mock routes
     return _jsonResponse(
       statusCode: 404,
@@ -60,6 +69,45 @@ class MockHttpClient extends http.BaseClient {
         body: {'message': 'Invalid email or password'},
       );
     }
+
+    return _jsonResponse(
+      statusCode: 200,
+      body: {
+        'id': user.id,
+        'email': user.email,
+        'display_name': user.displayName,
+        'photo_url': user.photoUrl,
+        'token': 'mock_jwt_token_${user.id}',
+      },
+    );
+  }
+
+  /// Validates a Google id token and resolves it to a canned Google
+  /// identity, upserting the user so repeat sign-ins are idempotent.
+  ///
+  /// TODO(new backend): real flow verifies the id token server-side.
+  Future<http.StreamedResponse> _handleGoogle(http.BaseRequest request) async {
+    final body = await _parseBody(request);
+    final idToken = body['id_token'] as String? ?? '';
+
+    if (idToken.isEmpty) {
+      return _jsonResponse(
+        statusCode: 401,
+        body: {'message': 'Missing or invalid Google id token'},
+      );
+    }
+
+    const googleEmail = 'rider.google@gmail.com';
+    final user = _users.putIfAbsent(
+      googleEmail,
+      () => _MockUserEntry(
+        id: 'usr_mock_google_001',
+        email: googleEmail,
+        password: '', // passwordless: Google identity only
+        displayName: 'May Vong',
+        photoUrl: null,
+      ),
+    );
 
     return _jsonResponse(
       statusCode: 200,

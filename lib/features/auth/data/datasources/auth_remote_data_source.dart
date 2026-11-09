@@ -8,6 +8,7 @@ import '../models/user_model.dart';
 /// Contract for the auth API, so the implementation is swappable in tests.
 abstract interface class AuthRemoteDataSource {
   Future<UserModel> signIn({required String email, required String password});
+  Future<UserModel> signInWithGoogle({required String idToken});
   Future<UserModel> register({
     required String email,
     required String password,
@@ -26,6 +27,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final http.Client _client;
 
   static final _endpoint = Uri.parse('https://api.example.com/v1/auth/login');
+  static final _googleEndpoint =
+      Uri.parse('https://api.example.com/v1/auth/google');
   static final _registerEndpoint =
       Uri.parse('https://api.example.com/v1/auth/register');
 
@@ -54,6 +57,33 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         throw const InvalidCredentialsException();
       default:
         throw ServerException('Login failed (${response.statusCode})');
+    }
+  }
+
+  @override
+  Future<UserModel> signInWithGoogle({required String idToken}) async {
+    final http.Response response;
+    try {
+      response = await _client.post(
+        _googleEndpoint,
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({'id_token': idToken}),
+      );
+    } on http.ClientException {
+      throw const NetworkException();
+    }
+
+    switch (response.statusCode) {
+      case 200:
+      case 201:
+        return UserModel.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>,
+        );
+      case 401:
+        throw const InvalidCredentialsException(
+            'Google sign-in was rejected');
+      default:
+        throw ServerException('Google sign-in failed (${response.statusCode})');
     }
   }
 

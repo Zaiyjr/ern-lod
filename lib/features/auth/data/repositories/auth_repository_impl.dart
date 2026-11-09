@@ -44,6 +44,23 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, User>> signInWithGoogle(
+      {required String idToken}) async {
+    try {
+      final UserModel user = await _remote.signInWithGoogle(idToken: idToken);
+      return Right(user.toEntity());
+    } on InvalidCredentialsException catch (e) {
+      return Left(InvalidCredentialsFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(UnexpectedFailure());
+    }
+  }
+
+  @override
   Future<Either<Failure, User>> register({
     required String email,
     required String password,

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ride_booking/core/error/failures.dart';
 import 'package:ride_booking/features/auth/domain/entities/user.dart';
 import 'package:ride_booking/features/auth/domain/usecases/check_auth_status.dart';
+import 'package:ride_booking/features/auth/domain/usecases/google_sign_in.dart';
 import 'package:ride_booking/features/auth/domain/usecases/register.dart';
 import 'package:ride_booking/features/auth/domain/usecases/sign_in.dart';
 import 'package:ride_booking/features/auth/domain/usecases/sign_out.dart';
@@ -16,15 +17,18 @@ void main() {
   AuthBloc buildBloc({
     User? user,
     Failure? signInFailure,
+    Failure? googleSignInFailure,
     Failure? registerFailure,
   }) {
     final repository = FakeAuthRepository(
       user: user,
       signInFailure: signInFailure,
+      googleSignInFailure: googleSignInFailure,
       registerFailure: registerFailure,
     );
     return AuthBloc(
       signIn: SignIn(repository),
+      googleSignIn: GoogleSignIn(repository),
       register: Register(repository),
       checkAuthStatus: CheckAuthStatus(repository),
       signOut: SignOut(repository),
@@ -88,6 +92,40 @@ void main() {
       email: 'rider@example.com',
       password: 'wrong',
     ));
+    await expectation;
+    await bloc.close();
+  });
+
+  test('AuthGoogleSignInRequested emits [loading, authenticated] on success',
+      () async {
+    final bloc = buildBloc(user: user);
+    var cached = false;
+    bloc.stream
+        .where((s) => s is AuthAuthenticated)
+        .listen((_) => cached = true);
+    final expectation = expectLater(
+      bloc.stream,
+      emitsInOrder([isA<AuthLoading>(), isA<AuthAuthenticated>()]),
+    );
+
+    bloc.add(const AuthGoogleSignInRequested());
+    await expectation;
+    expect(cached, isTrue, reason: 'Google sign-in must cache the session');
+    await bloc.close();
+  });
+
+  test('AuthGoogleSignInRequested emits [loading, unauthenticated] on failure',
+      () async {
+    final bloc = buildBloc(
+      user: user,
+      googleSignInFailure: const InvalidCredentialsFailure(),
+    );
+    final expectation = expectLater(
+      bloc.stream,
+      emitsInOrder([isA<AuthLoading>(), isA<AuthUnauthenticated>()]),
+    );
+
+    bloc.add(const AuthGoogleSignInRequested());
     await expectation;
     await bloc.close();
   });

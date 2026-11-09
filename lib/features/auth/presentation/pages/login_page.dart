@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/constants/demo_account.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../bloc/auth_bloc.dart';
+
+/// Brand glyph color for the Google button. Product design.md forbids
+/// feature-specific hex literals; the brand mark is the one deliberate
+/// exception, mirroring official Google brand guidance.
+const Color _googleBlue = Color(0xFF4285F4);
 
 /// Email + password form that dispatches [AuthSignInRequested].
 ///
@@ -37,6 +43,22 @@ class _LoginPageState extends State<LoginPage> {
             password: _passwordController.text,
           ),
         );
+  }
+
+  /// Quick sign-in with the seeded demo account, no typing needed.
+  void _signInAsDemo() {
+    context.read<AuthBloc>().add(
+          const AuthSignInRequested(
+            email: DemoAccount.email,
+            password: DemoAccount.password,
+          ),
+        );
+  }
+
+  /// Mock Google flow through the same bloc/use-case path as password
+  /// sign-in; a real id token is obtained here once the provider lands.
+  void _signInWithGoogle() {
+    context.read<AuthBloc>().add(const AuthGoogleSignInRequested());
   }
 
   @override
@@ -103,6 +125,7 @@ class _LoginPageState extends State<LoginPage> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // Primary CTA: email + password sign-in
                             ElevatedButton(
                               onPressed: loading ? null : _submit,
                               child: loading
@@ -116,6 +139,61 @@ class _LoginPageState extends State<LoginPage> {
                                     )
                                   : const Text('Sign in'),
                             ),
+
+                            // Demo account quick sign-in
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.accent,
+                                side: const BorderSide(
+                                  color: AppColors.lineStrong,
+                                ),
+                              ),
+                              onPressed: loading ? null : _signInAsDemo,
+                              icon: const Icon(Icons.bolt_rounded, size: 20),
+                              label: const Text('Use demo account'),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Demo: ${DemoAccount.email} · '
+                              '${DemoAccount.password}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+                            const _OrDivider(),
+
+                            // Google sign-in
+                            const SizedBox(height: 8),
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.textPrimary,
+                                side: const BorderSide(
+                                  color: AppColors.lineStrong,
+                                ),
+                              ),
+                              onPressed: loading ? null : _signInWithGoogle,
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'G',
+                                    style: TextStyle(
+                                      color: _googleBlue,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text('Continue with Google'),
+                                ],
+                              ),
+                            ),
+
                             if (state is AuthUnauthenticated &&
                                 state.message != null) ...[
                               const SizedBox(height: 16),
@@ -157,6 +235,32 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Horizontal rule with an "or" caption separating sign-in methods.
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        Expanded(child: Divider(color: AppColors.line)),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'or',
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Expanded(child: Divider(color: AppColors.line)),
+      ],
     );
   }
 }
