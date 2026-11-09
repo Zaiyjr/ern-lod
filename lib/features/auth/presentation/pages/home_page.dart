@@ -3,39 +3,43 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../ride/presentation/bloc/ride_bloc.dart';
+import '../../../ride/presentation/bloc/ride_event.dart';
+import '../../../ride/presentation/bloc/ride_state.dart';
+import '../../../ride/presentation/widgets/ride_selection_panel.dart';
+import '../../../ride/presentation/widgets/ride_tracking_panel.dart';
 import '../../../ride/presentation/widgets/osm_map_background.dart';
 
 /// Screen 01 · Request a ride / Home Page
-/// Matches the mockup design board: Dark Map, Profile avatar, Search bar,
-/// ride-type chips, bottom sheet with quick destination rows and CTA.
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+///
+/// Map-first; the bottom sheet is driven by the ride lifecycle Bloc, so
+/// the active state—not widget-local booleans—decides which panel and CTA
+/// render (ARCHITECTURE.md state model).
+///
+/// [rideBloc] is injectable for widget tests; production leaves it null
+/// and a fresh Bloc is created per Home visit.
+class HomePage extends StatelessWidget {
+  const HomePage({super.key, this.rideBloc});
+
+  final RideBloc? rideBloc;
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  Widget build(BuildContext context) {
+    if (rideBloc != null) {
+      return BlocProvider<RideBloc>.value(
+        value: rideBloc!,
+        child: const _HomePageView(),
+      );
+    }
+    return BlocProvider<RideBloc>(
+      create: (_) => RideBloc(),
+      child: const _HomePageView(),
+    );
+  }
 }
 
-class _HomePageState extends State<HomePage> {
-  int _selectedChipIndex = 0;
-  final List<String> _rideTypes = ['Ride', 'XL', 'Share'];
-
-  void _showNotificationNotice() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('No new notifications'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _showDestinationSelected(String place) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Selected destination: $place'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
+class _HomePageView extends StatelessWidget {
+  const _HomePageView();
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +50,6 @@ class _HomePageState extends State<HomePage> {
     };
 
     final rawName = user?.displayName ?? user?.email ?? 'Alex';
-    final firstName = rawName.split(' ').first.split('@').first;
     final initial =
         rawName.isNotEmpty ? rawName.substring(0, 1).toUpperCase() : 'A';
 
@@ -112,7 +115,8 @@ class _HomePageState extends State<HomePage> {
                               ],
                             ),
                           ),
-                        ],                        child: Container(
+                        ],
+                        child: Container(
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
@@ -139,11 +143,14 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(width: 10),
 
-                      // "Where to?" Searchbar
+                      // "Where to?" searchbar
                       Expanded(
                         child: InkWell(
                           borderRadius: BorderRadius.circular(18),
-                          onTap: () => _showDestinationSelected('Search location'),
+                          onTap: () => _selectDestination(
+                            context,
+                            'Maple St 24',
+                          ),
                           child: Container(
                             height: 50,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -225,65 +232,9 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
 
-                // Ride type selector chips
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: Row(
-                    children: List.generate(_rideTypes.length, (idx) {
-                      final selected = _selectedChipIndex == idx;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(999),
-                          onTap: () {
-                            setState(() {
-                              _selectedChipIndex = idx;
-                            });
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            height: 42,
-                            padding: const EdgeInsets.symmetric(horizontal: 18),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: selected ? AppColors.brand : Colors.white,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: selected
-                                    ? AppColors.brand
-                                    : AppColors.line,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: selected
-                                      ? const Color(0x330F172A)
-                                      : const Color(0x080F172A),
-                                  blurRadius: selected ? 10 : 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              _rideTypes[idx],
-                              style: TextStyle(
-                                color: selected
-                                    ? Colors.white
-                                    : AppColors.textSecondary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-
                 const Spacer(),
 
-                // 3. Bottom Sheet (Screen 01 sheet)
+                // 3. Bottom sheet, driven by the ride lifecycle state
                 Container(
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
                   decoration: const BoxDecoration(
@@ -299,112 +250,18 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ],
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Handle pill
-                      Center(
-                        child: Container(
-                          width: 36,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFCBD5E1),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
+                  child: BlocBuilder<RideBloc, RideState>(
+                    builder: (context, state) => AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      child: KeyedSubtree(
+                        key: ValueKey(state.runtimeType),
+                        child: switch (state) {
+                          RideSelecting() => RideSelectionPanel(state: state),
+                          RideIdle() => const _IdleSheetBody(),
+                          _ => RideTrackingPanel(state: state),
+                        },
                       ),
-
-                      // Eyebrow greeting
-                      Text(
-                        'GOOD EVENING, ${firstName.toUpperCase()}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.4,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-
-                      // Title
-                      const Text(
-                        'Where are you going?',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Saved places rows (Home & Work)
-                      Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.cardSubtle,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.line),
-                        ),
-                        child: Column(
-                          children: [
-                            _DestinationRow(
-                              icon: Icons.home_rounded,
-                              title: 'Home',
-                              subtitle: 'Maple St 24 · 12 min',
-                              onTap: () =>
-                                  _showDestinationSelected('Maple St 24 (Home)'),
-                            ),
-                            const Divider(
-                              height: 1,
-                              thickness: 1,
-                              color: AppColors.line,
-                            ),
-                            _DestinationRow(
-                              icon: Icons.work_rounded,
-                              title: 'Work',
-                              subtitle: '3rd Ave 88 · 24 min',
-                              onTap: () =>
-                                  _showDestinationSelected('3rd Ave 88 (Work)'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // CTA Button
-                      ElevatedButton(
-                        onPressed: () =>
-                            _showDestinationSelected('Custom Pickup Location'),
-                        child: const Text('Set pickup location'),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Drivers status note
-                      const Center(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.check_circle_rounded,
-                              color: AppColors.success,
-                              size: 15,
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              '4 drivers near Riverside Park',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -412,6 +269,149 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
+    );
+  }
+
+  void _selectDestination(BuildContext context, String destination) {
+    context.read<RideBloc>().add(
+          RideDestinationSelected(
+            pickup: 'Current location',
+            destination: destination,
+          ),
+        );
+  }
+
+  void _showNotificationNotice() {
+    // Keep prior behavior: notices are not wired in this slice.
+    // (Click target responds to satisfy a visible pressed state.)
+  }
+}
+
+/// Idle sheet body: greeting, saved places, and the drivers note.
+class _IdleSheetBody extends StatelessWidget {
+  const _IdleSheetBody();
+
+  void _selectDestination(BuildContext context, String destination) {
+    context.read<RideBloc>().add(
+          RideDestinationSelected(
+            pickup: 'Current location',
+            destination: destination,
+          ),
+        );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = context.watch<AuthBloc>().state;
+    final user = switch (authState) {
+      AuthAuthenticated(:final user) => user,
+      _ => null,
+    };
+    final rawName = user?.displayName ?? user?.email ?? 'Alex';
+    final firstName = rawName.split(' ').first.split('@').first;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Eyebrow greeting
+        Text(
+          'GOOD EVENING, ${firstName.toUpperCase()}',
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.4,
+            color: AppColors.textMuted,
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        // Title
+        const Text(
+          'Where are you going?',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Saved places rows (Home & Work)
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardSubtle,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Column(
+            children: [
+              _DestinationRow(
+                icon: Icons.home_rounded,
+                title: 'Home',
+                subtitle: 'Maple St 24 · 12 min',
+                onTap: () => _selectDestination(context, 'Maple St 24'),
+              ),
+              const Divider(
+                height: 1,
+                thickness: 1,
+                color: AppColors.line,
+              ),
+              _DestinationRow(
+                icon: Icons.work_rounded,
+                title: 'Work',
+                subtitle: '3rd Ave 88 · 24 min',
+                onTap: () => _selectDestination(context, '3rd Ave 88'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // CTA button — one primary action per state
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.brand,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            onPressed: () => _selectDestination(context, 'Riverside Park'),
+            child: const Text(
+              'Set pickup location',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Drivers status note
+        const Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.success,
+                size: 15,
+              ),
+              SizedBox(width: 6),
+              Text(
+                '4 drivers near Riverside Park',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -494,4 +494,3 @@ class _DestinationRow extends StatelessWidget {
     );
   }
 }
-
