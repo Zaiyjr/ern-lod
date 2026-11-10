@@ -109,7 +109,8 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
     _pickupGeocodeBusy = true;
     _lastPickupGeocodePoint = position;
     try {
-      final address = await _geocodingService.reverseGeocode(position);
+      // Compact label so the sheet chip stays 1–2 lines.
+      final address = await _geocodingService.reverseGeocodeShort(position);
       if (!mounted) return;
       if (address == null) return;
       setState(() {}); // allow pick-state UI to refresh
@@ -129,7 +130,7 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
     });
     try {
       final address =
-          await _geocodingService.reverseGeocode(point, zoom: 19) ??
+          await _geocodingService.reverseGeocodeShort(point, zoom: 19) ??
               _describePoint(point);
       if (!mounted) return;
       widget.onPointSelected?.call(MapPointAddress(point, address));
@@ -235,10 +236,32 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
             onTap: (tapPosition, point) => _onMapTap(point),
           ),
           children: [
-            // 1. OpenStreetMap Tile Layer
+            // 1. CARTO Positron tile layer — the calm, light basemap style
+            // ride apps use; avoids OSM Carto's noisy survey look.
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              urlTemplate:
+                  'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.example.ride_booking',
+            ),
+
+            // 1b. Required source attribution (OSM + CARTO usage terms).
+            RichAttributionWidget(
+              attributions: [
+                TextSourceAttribution(
+                  '© OpenStreetMap contributors',
+                  textStyle: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                TextSourceAttribution(
+                  '© CARTO',
+                  textStyle: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
 
             // 2. Markers: Rider GPS Position & Simulated Nearby Drivers
@@ -367,10 +390,12 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
           ],
         ),
 
-        // Recenter Floating Action Button (Thumb Zone right side)
+        // Recenter Floating Action Button (Thumb Zone right side).
+        // Sits above the tallest sheet state so the idle panel never
+        // covers it.
         Positioned(
           right: 16,
-          bottom: 270,
+          bottom: 350,
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
             onTap: _recenter,

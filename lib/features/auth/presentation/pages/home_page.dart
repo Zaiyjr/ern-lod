@@ -395,9 +395,38 @@ class _IdleSheetBody extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
+        // Real-time pickup address resolved from the rider's GPS position,
+        // shown directly above the CTA so the shortest visual path reads
+        // "departing from X → set pickup".
+        Row(
+          children: [
+            const Icon(
+              Icons.near_me_rounded,
+              size: 16,
+              color: AppColors.accent,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                pickupAddress != null
+                    ? 'Departing from $pickupAddress'
+                    : 'Locating your pickup address…',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
         // CTA button — one primary action per state
         SizedBox(
-          height: 52,
+          height: 50,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.brand,
@@ -414,34 +443,6 @@ class _IdleSheetBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-
-        const SizedBox(height: 12),
-
-        // Real-time pickup address resolved from the rider's GPS position
-        Row(
-          children: [
-            const Icon(
-              Icons.near_me_rounded,
-              size: 16,
-              color: AppColors.accent,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                pickupAddress != null
-                    ? 'Departing from\n$pickupAddress'
-                    : 'Locating your pickup address…',
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
-          ],
-        ),
 
         // Drivers status note
         const Center(
