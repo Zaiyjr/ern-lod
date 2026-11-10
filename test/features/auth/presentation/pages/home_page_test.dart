@@ -156,6 +156,27 @@ void main() {
     expect(find.text('Ride cancelled'), findsOneWidget);
     expect(find.text('Start a new ride'), findsOneWidget);
   });
+
+  testWidgets(
+      'selecting destination replaces search bar with back button and clears on tap',
+      (tester) async {
+    await tester.pumpWidget(wrap());
+
+    expect(find.text('Where to?'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsNothing);
+
+    await tester.tap(find.text('Home'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Where to?'), findsNothing);
+    expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Where to?'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsNothing);
+  });
 }
 
 /// Bloc with staggered simulated delays (200/300/400ms) so each phase is

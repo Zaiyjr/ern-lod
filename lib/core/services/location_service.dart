@@ -5,7 +5,7 @@ import 'package:latlong2/latlong.dart';
 
 /// Real-time device location provider and stream manager.
 class LocationService {
-  static const LatLng defaultFallback = LatLng(13.7563, 100.5018); // Default fallback
+  static const LatLng defaultFallback = LatLng(17.9757, 102.6331); // Patuxai, Vientiane — used only when the device reports no location
 
   StreamSubscription<Position>? _positionSubscription;
 

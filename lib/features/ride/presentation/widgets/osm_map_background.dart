@@ -7,6 +7,19 @@ import '../../../../core/services/geocoding_service.dart';
 import '../../../../core/services/location_service.dart';
 import '../../../../core/theme/app_colors.dart';
 
+/// Available map basemap styles without API key requirements.
+enum AppMapType {
+  streets,
+  satellite,
+  clean;
+
+  String get label => switch (this) {
+        streets => 'Streets (OSM)',
+        satellite => 'Satellite (Esri)',
+        clean => 'Clean navigation',
+      };
+}
+
 /// A point chosen on the map together with its reverse-geocoded address.
 class MapPointAddress {
   const MapPointAddress(this.point, this.address);
@@ -14,22 +27,20 @@ class MapPointAddress {
   final LatLng point;
 
   /// Human-readable address from OSM Nominatim, or a coordinate fallback
-  /// when lookup fails (rarely null in practice).
+  /// when lookup fails.
   final String address;
 }
 
-/// Interactive OpenStreetMap background widget with real-time GPS tracking
-/// and reverse-geocoded addresses:
-/// - Resolves the GPS position to a human-readable address whenever the
-///   rider moves more than [_geocodeMinDistanceMeters] (throttled).
-/// - Lets a rider tap the map to choose a destination point; the tap is
-///   reverse-geocoded and delivered through [onPointSelected].
+/// Interactive OpenStreetMap background widget with real-time GPS tracking,
+/// multiple map styles (Streets, Satellite, Clean), route polyline support,
+/// and reverse-geocoded addresses.
 class OsmMapBackground extends StatefulWidget {
   const OsmMapBackground({
     super.key,
     this.initialCenter = LocationService.defaultFallback,
-    this.initialZoom = 15.0,
+    this.initialZoom = 15.5,
     this.enableRealtimeLocation = true,
+    this.destinationPoint,
     this.onLocationChanged,
     this.onPickupAddressResolved,
     this.onPointSelected,
@@ -38,6 +49,11 @@ class OsmMapBackground extends StatefulWidget {
   final LatLng initialCenter;
   final double initialZoom;
   final bool enableRealtimeLocation;
+
+  /// Active destination point; when non-null, a route polyline is rendered
+  /// and the camera bounds fit both pickup and destination.
+  final LatLng? destinationPoint;
+
   final ValueChanged<LatLng>? onLocationChanged;
 
   /// Fires once the map resolves the GPS position to an address (and
@@ -61,6 +77,9 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
   late LatLng _currentLocation;
   late List<LatLng> _mockDrivers;
   bool _hasRealLocation = false;
+  bool _followUser = true;
+
+  AppMapType _mapType = AppMapType.streets;
 
   /// Resolved GPS address event source — kept via callbacks only.
   bool _pickupGeocodeBusy = false;
@@ -86,12 +105,45 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant OsmMapBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.destinationPoint != null &&
+        widget.destinationPoint != oldWidget.destinationPoint) {
+      _fitRouteBounds(_currentLocation, widget.destinationPoint!);
+    }
+  }
+
+  void _fitRouteBounds(LatLng p1, LatLng p2) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        final bounds = LatLngBounds.fromPoints([p1, p2]);
+        _mapController.fitCamera(
+          CameraFit.bounds(
+            bounds: bounds,
+            padding: const EdgeInsets.only(
+              top: 110,
+              bottom: 360,
+              left: 48,
+              right: 48,
+            ),
+            maxZoom: 16.5,
+          ),
+        );
+      } catch (e) {
+        debugPrint('[OsmMapBackground] fitRouteBounds error: $e');
+      }
+    });
+  }
+
   void _updateMockDrivers(LatLng center) {
+    // Keep simulated drivers closer within visible street perimeter
     _mockDrivers = [
-      LatLng(center.latitude + 0.0035, center.longitude + 0.0032),
-      LatLng(center.latitude - 0.0031, center.longitude - 0.0038),
-      LatLng(center.latitude + 0.0048, center.longitude - 0.0026),
-      LatLng(center.latitude - 0.0020, center.longitude + 0.0045),
+      LatLng(center.latitude + 0.0016, center.longitude + 0.0015),
+      LatLng(center.latitude - 0.0014, center.longitude - 0.0016),
+      LatLng(center.latitude + 0.0012, center.longitude - 0.0018),
+      LatLng(center.latitude - 0.0017, center.longitude + 0.0014),
     ];
   }
 
@@ -109,24 +161,23 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
     _pickupGeocodeBusy = true;
     _lastPickupGeocodePoint = position;
     try {
-      // Compact label so the sheet chip stays 1–2 lines.
       final address = await _geocodingService.reverseGeocodeShort(position);
       if (!mounted) return;
       if (address == null) return;
-      setState(() {}); // allow pick-state UI to refresh
+      setState(() {});
       widget.onPickupAddressResolved?.call(address);
     } finally {
       _pickupGeocodeBusy = false;
     }
   }
 
-  /// Reverse-geocodes a tapped map point and reports it as the chosen
-  /// destination.
+  /// Reverse-geocodes a tapped map point and reports it as the chosen destination.
   Future<void> _onMapTap(LatLng point) async {
     if (widget.onPointSelected == null) return;
     setState(() {
       _pickedPoint = point;
       _pickedGeocodeBusy = true;
+      _followUser = false;
     });
     try {
       final address =
@@ -141,8 +192,6 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
     }
   }
 
-  /// Coordinate fallback so a destination pick can never dead-end when
-  /// the lookup service is unavailable.
   static String _describePoint(LatLng point) =>
       'Pinned location (${point.latitude.toStringAsFixed(5)}, '
       '${point.longitude.toStringAsFixed(5)})';
@@ -155,12 +204,16 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
         _hasRealLocation = true;
         _updateMockDrivers(initialPos);
       });
-      _mapController.move(initialPos, widget.initialZoom);
+      if (widget.destinationPoint == null) {
+        _mapController.move(initialPos, widget.initialZoom);
+      } else {
+        _fitRouteBounds(initialPos, widget.destinationPoint!);
+      }
       widget.onLocationChanged?.call(initialPos);
       unawaited(_resolvePickupAddress(initialPos));
     }
 
-    // Subscribe to ongoing position stream with auto-follow
+    // Subscribe to continuous location updates
     try {
       _locationSub = _locationService.getRealtimeLocationStream().listen(
         (pos) {
@@ -170,8 +223,9 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
             _hasRealLocation = true;
             _updateMockDrivers(pos);
           });
-          // Smoothly pan camera as device moves
-          _mapController.move(pos, _mapController.camera.zoom);
+          if (_followUser && widget.destinationPoint == null) {
+            _mapController.move(pos, _mapController.camera.zoom);
+          }
           widget.onLocationChanged?.call(pos);
           unawaited(_resolvePickupAddress(pos));
         },
@@ -184,9 +238,26 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
     }
   }
 
+  void _cycleMapType() {
+    setState(() {
+      _mapType = switch (_mapType) {
+        AppMapType.streets => AppMapType.satellite,
+        AppMapType.satellite => AppMapType.clean,
+        AppMapType.clean => AppMapType.streets,
+      };
+    });
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Layer: ${_mapType.label}'),
+        duration: const Duration(milliseconds: 900),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   void _recenter() async {
-    // If we haven't obtained real location yet, trigger a fresh request with user feedback
+    setState(() => _followUser = true);
     if (!_hasRealLocation) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -209,7 +280,6 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
     _mapController.move(_currentLocation, 16.0);
   }
 
-
   @override
   void dispose() {
     _locationSub?.cancel();
@@ -217,8 +287,11 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
     _mapController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
+    final effectiveDestination = widget.destinationPoint ?? _pickedPoint;
+
     return Stack(
       children: [
         FlutterMap(
@@ -226,45 +299,81 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
           options: MapOptions(
             initialCenter: _currentLocation,
             initialZoom: widget.initialZoom,
-            minZoom: 4,
+            minZoom: 3,
             maxZoom: 19,
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.all,
             ),
-            // Tap-to-pick: reverse-geocode the tapped point so the sheet
-            // shows the real address, not coordinates.
+            onPositionChanged: (camera, hasGesture) {
+              if (hasGesture && _followUser) {
+                setState(() => _followUser = false);
+              }
+            },
             onTap: (tapPosition, point) => _onMapTap(point),
           ),
           children: [
-            // 1. CARTO Positron tile layer — the calm, light basemap style
-            // ride apps use; avoids OSM Carto's noisy survey look.
-            TileLayer(
-              urlTemplate:
-                  'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.ride_booking',
-            ),
+            // 1. Clean basemap tile layer without watermark
+            switch (_mapType) {
+              AppMapType.streets => TileLayer(
+                  key: const ValueKey('streets_layer'),
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.ride_booking',
+                  maxZoom: 19,
+                ),
+              AppMapType.satellite => TileLayer(
+                  key: const ValueKey('satellite_layer'),
+                  urlTemplate:
+                      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                  userAgentPackageName: 'com.example.ride_booking',
+                  maxZoom: 19,
+                ),
+              AppMapType.clean => TileLayer(
+                  key: const ValueKey('clean_layer'),
+                  urlTemplate:
+                      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+                  userAgentPackageName: 'com.example.ride_booking',
+                  maxZoom: 19,
+                ),
+            },
 
-            // 1b. Required source attribution (OSM + CARTO usage terms).
+            // 2. Open attribution
             RichAttributionWidget(
               attributions: [
-                TextSourceAttribution(
-                  '© OpenStreetMap contributors',
-                  textStyle: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textSecondary,
+                if (_mapType == AppMapType.streets)
+                  const TextSourceAttribution(
+                    '© OpenStreetMap contributors',
+                    textStyle: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textSecondary,
+                    ),
+                  )
+                else
+                  const TextSourceAttribution(
+                    '© Esri & contributors',
+                    textStyle: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
-                TextSourceAttribution(
-                  '© CARTO',
-                  textStyle: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
               ],
             ),
 
-            // 2. Markers: Rider GPS Position & Simulated Nearby Drivers
+            // 3. Route polyline when destination is chosen
+            if (effectiveDestination != null)
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: [_currentLocation, effectiveDestination],
+                    strokeWidth: 4.5,
+                    color: AppColors.accent,
+                    borderColor: Colors.white,
+                    borderStrokeWidth: 1.5,
+                  ),
+                ],
+              ),
+
+            // 4. Markers: Rider GPS, Nearby Drivers & Destination Pin
             MarkerLayer(
               markers: [
                 // Real-time Rider GPS location marker
@@ -308,7 +417,7 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
                   ),
                 ),
 
-                // Nearby drivers
+                // Nearby simulated drivers
                 ..._mockDrivers.map(
                   (pos) => Marker(
                     point: pos,
@@ -318,6 +427,10 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
                       decoration: BoxDecoration(
                         color: AppColors.brand,
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.white,
+                          width: 1.5,
+                        ),
                         boxShadow: const [
                           BoxShadow(
                             color: Color(0x260F172A),
@@ -335,31 +448,37 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
                   ),
                 ),
 
-                // Destination pin for the point the rider tapped
-                if (_pickedPoint != null)
+                // Destination pin for the chosen point
+                if (effectiveDestination != null)
                   Marker(
-                    point: _pickedPoint!,
-                    width: 40,
-                    height: 46,
+                    point: effectiveDestination,
+                    width: 44,
+                    height: 50,
                     child: _pickedGeocodeBusy
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: AppColors.accent,
+                        ? const Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: AppColors.accent,
+                              ),
                             ),
                           )
                         : Stack(
                             alignment: Alignment.topCenter,
                             children: [
                               Container(
-                                width: 34,
-                                height: 34,
-                                decoration: const BoxDecoration(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: AppColors.accent,
-                                  boxShadow: [
+                                  color: AppColors.brand,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  boxShadow: const [
                                     BoxShadow(
                                       color: Color(0x330F172A),
                                       blurRadius: 8,
@@ -370,16 +489,19 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
                                 child: const Icon(
                                   Icons.location_on_rounded,
                                   color: Colors.white,
-                                  size: 20,
+                                  size: 22,
                                 ),
                               ),
-                              // Pointed tip toward the map position
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppColors.accent,
+                              // Pointed tip toward ground position
+                              Positioned(
+                                bottom: 6,
+                                child: Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: AppColors.brand,
+                                  ),
                                 ),
                               ),
                             ],
@@ -390,38 +512,75 @@ class _OsmMapBackgroundState extends State<OsmMapBackground> {
           ],
         ),
 
-        // Recenter Floating Action Button (Thumb Zone right side).
-        // Sits above the tallest sheet state so the idle panel never
-        // covers it.
+        // Floating map controls (Layer Switcher & Recenter GPS)
         Positioned(
           right: 16,
-          bottom: 350,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: _recenter,
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.white,
+          bottom: widget.destinationPoint != null ? 370 : 310,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Map layer toggle
+              InkWell(
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.line),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x1A0F172A),
-                    blurRadius: 14,
-                    offset: Offset(0, 4),
+                onTap: _cycleMapType,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.line),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x1A0F172A),
+                        blurRadius: 12,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
                   ),
-                ],
+                  child: Icon(
+                    _mapType == AppMapType.satellite
+                        ? Icons.satellite_alt_rounded
+                        : Icons.layers_rounded,
+                    color: _mapType == AppMapType.satellite
+                        ? AppColors.accent
+                        : AppColors.textPrimary,
+                    size: 22,
+                  ),
+                ),
               ),
-              child: Icon(
-                _hasRealLocation
-                    ? Icons.my_location_rounded
-                    : Icons.location_searching_rounded,
-                color: _hasRealLocation ? AppColors.accent : AppColors.textSecondary,
-                size: 22,
+              const SizedBox(height: 10),
+              // Recenter GPS button
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: _recenter,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.line),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x1A0F172A),
+                        blurRadius: 12,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    _followUser
+                        ? Icons.my_location_rounded
+                        : Icons.location_searching_rounded,
+                    color: _followUser
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
+                    size: 22,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ],

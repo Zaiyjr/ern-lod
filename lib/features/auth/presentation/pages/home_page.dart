@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:latlong2/latlong.dart';
 
+import '../../../../core/services/location_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../ride/presentation/bloc/ride_bloc.dart';
@@ -50,6 +52,37 @@ class _HomePageViewState extends State<_HomePageView> {
   /// reverse geocoding; null until the first lookup settles.
   String? _pickupAddress;
 
+  /// Latest user GPS coordinate received from the map widget.
+  LatLng? _currentGpsPosition;
+
+  /// Active destination point for route line and camera framing.
+  LatLng? _destinationPoint;
+
+  void _selectDestination(
+    BuildContext context,
+    String destination, {
+    LatLng? point,
+  }) {
+    final center = _currentGpsPosition ?? LocationService.defaultFallback;
+    final effectivePoint = point ??
+        (destination == 'Maple St 24'
+            ? LatLng(center.latitude + 0.0035, center.longitude + 0.0030)
+            : destination == '3rd Ave 88'
+                ? LatLng(center.latitude - 0.0032, center.longitude - 0.0028)
+                : LatLng(center.latitude + 0.0042, center.longitude - 0.0032));
+    setState(() => _destinationPoint = effectivePoint);
+    context.read<RideBloc>().add(
+          RideDestinationSelected(
+            pickup: _pickupAddress ?? 'Current location',
+            destination: destination,
+          ),
+        );
+  }
+
+  void _showNotificationNotice() {
+    // Keep prior behavior: notices are not wired in this slice.
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
@@ -62,269 +95,377 @@ class _HomePageViewState extends State<_HomePageView> {
     final initial =
         rawName.isNotEmpty ? rawName.substring(0, 1).toUpperCase() : 'A';
 
-    return Scaffold(
-      backgroundColor: AppColors.base,
-      body: Stack(
-        children: [
-          // 1. Real interactive OpenStreetMap background
-          Positioned.fill(
-            child: OsmMapBackground(
-              // Real-time address: reverse-geocode GPS movement (throttled)
-              onPickupAddressResolved: (address) =>
-                  setState(() => _pickupAddress = address),
-              // Tap-to-pick destination with its resolved address
-              onPointSelected: (picked) => context.read<RideBloc>().add(
-                    RideDestinationSelected(
-                      pickup: _pickupAddress ?? 'Current location',
-                      destination: picked.address,
-                    ),
-                  ),
+    return BlocListener<RideBloc, RideState>(
+      listener: (context, state) {
+        if (state is RideIdle && _destinationPoint != null) {
+          setState(() => _destinationPoint = null);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.base,
+        body: Stack(
+          children: [
+            // 1. Interactive OpenStreetMap background
+            Positioned.fill(
+              child: OsmMapBackground(
+                destinationPoint: _destinationPoint,
+                onLocationChanged: (pos) => _currentGpsPosition = pos,
+                // Real-time address: reverse-geocode GPS movement (throttled)
+                onPickupAddressResolved: (address) =>
+                    setState(() => _pickupAddress = address),
+                // Tap-to-pick destination with its resolved address
+                onPointSelected: (picked) {
+                  setState(() => _destinationPoint = picked.point);
+                  context.read<RideBloc>().add(
+                        RideDestinationSelected(
+                          pickup: _pickupAddress ?? 'Current location',
+                          destination: picked.address,
+                        ),
+                      );
+                },
+              ),
             ),
-          ),
 
-          // 2. Safe Area floating UI elements
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Top action bar
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      // Avatar / Profile button with menu for Sign Out
-                      PopupMenuButton<String>(
-                        tooltip: 'Profile options',
-                        offset: const Offset(0, 52),
-                        color: AppColors.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: const BorderSide(color: AppColors.line),
-                        ),
-                        onSelected: (val) {
-                          if (val == 'signout') {
-                            context
-                                .read<AuthBloc>()
-                                .add(const AuthSignOutRequested());
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            enabled: false,
-                            child: Text(
-                              user?.email ?? 'Signed in',
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                          const PopupMenuDivider(),
-                          const PopupMenuItem(
-                            value: 'signout',
-                            child: Row(
-                              children: [
-                                Icon(Icons.logout,
-                                    size: 18, color: AppColors.danger),
-                                SizedBox(width: 10),
-                                Text(
-                                  'Sign out',
-                                  style: TextStyle(color: AppColors.danger),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            color: AppColors.brand,
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x1F0F172A),
-                                blurRadius: 10,
-                                offset: Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            initial,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
-                      // "Where to?" searchbar
-                      Expanded(
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(18),
-                          onTap: () => _selectDestination(
-                            context,
-                            'Maple St 24',
-                          ),
-                          child: Container(
-                            height: 50,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(245),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: AppColors.line),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x0D0F172A),
-                                  blurRadius: 16,
-                                  offset: Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(
-                                  Icons.search,
-                                  color: AppColors.accent,
-                                  size: 22,
-                                ),
-                                SizedBox(width: 10),
-                                Text(
-                                  'Where to?',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w600,
+            // 2. Safe Area floating UI elements
+            SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Top action bar: adapts depending on whether ride selection is active
+                  BlocBuilder<RideBloc, RideState>(
+                    builder: (context, rideState) {
+                      if (rideState is RideSelecting) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: Row(
+                            children: [
+                              // Circular floating back button
+                              InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () => context
+                                    .read<RideBloc>()
+                                    .add(const RideDestinationCleared()),
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: AppColors.line),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0x140F172A),
+                                        blurRadius: 10,
+                                        offset: Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    size: 18,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
-                      // Notification bell with badge dot
-                      InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: _showNotificationNotice,
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(245),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.line),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x0D0F172A),
-                                blurRadius: 12,
-                                offset: Offset(0, 3),
                               ),
-                            ],
-                          ),
-                          child: const Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Icon(
-                                Icons.notifications_none,
-                                color: AppColors.textPrimary,
-                                size: 22,
-                              ),
-                              Positioned(
-                                top: 10,
-                                right: 10,
-                                child: CircleAvatar(
-                                  radius: 4,
-                                  backgroundColor: AppColors.warning,
+                              const SizedBox(width: 12),
+                              // Floating destination pill
+                              Expanded(
+                                child: Container(
+                                  height: 44,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withAlpha(245),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: AppColors.line),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0x0D0F172A),
+                                        blurRadius: 12,
+                                        offset: Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  alignment: Alignment.centerLeft,
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.place_rounded,
+                                        color: AppColors.accent,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          rideState.destination,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
                           ),
+                        );
+                      }
+
+                      if (rideState is RideIdle) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: Row(
+                            children: [
+                              // Avatar / Profile button with menu for Sign Out
+                              PopupMenuButton<String>(
+                                tooltip: 'Profile options',
+                                offset: const Offset(0, 52),
+                                color: AppColors.surface,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: const BorderSide(color: AppColors.line),
+                                ),
+                                onSelected: (val) {
+                                  if (val == 'signout') {
+                                    context
+                                        .read<AuthBloc>()
+                                        .add(const AuthSignOutRequested());
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    enabled: false,
+                                    child: Text(
+                                      user?.email ?? 'Signed in',
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                  const PopupMenuDivider(),
+                                  const PopupMenuItem(
+                                    value: 'signout',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.logout,
+                                            size: 18, color: AppColors.danger),
+                                        SizedBox(width: 10),
+                                        Text(
+                                          'Sign out',
+                                          style: TextStyle(
+                                              color: AppColors.danger),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    color: AppColors.brand,
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0x1F0F172A),
+                                        blurRadius: 10,
+                                        offset: Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    initial,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+
+                              // "Where to?" searchbar
+                              Expanded(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(18),
+                                  onTap: () => _selectDestination(
+                                    context,
+                                    'Maple St 24',
+                                  ),
+                                  child: Container(
+                                    height: 50,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withAlpha(245),
+                                      borderRadius: BorderRadius.circular(18),
+                                      border: Border.all(color: AppColors.line),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0x0D0F172A),
+                                          blurRadius: 16,
+                                          offset: Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Row(
+                                      children: [
+                                        Icon(
+                                          Icons.search,
+                                          color: AppColors.accent,
+                                          size: 22,
+                                        ),
+                                        SizedBox(width: 10),
+                                        Text(
+                                          'Where to?',
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 14.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+
+                              // Notification bell with badge dot
+                              InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: _showNotificationNotice,
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withAlpha(245),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: AppColors.line),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0x0D0F172A),
+                                        blurRadius: 12,
+                                        offset: Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.notifications_none,
+                                        color: AppColors.textPrimary,
+                                        size: 22,
+                                      ),
+                                      Positioned(
+                                        top: 10,
+                                        right: 10,
+                                        child: CircleAvatar(
+                                          radius: 4,
+                                          backgroundColor: AppColors.warning,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      // Tracking/matching/summary states: minimal top spacer
+                      return const SizedBox(height: 8);
+                    },
+                  ),
+
+                  const Spacer(),
+
+                  // 3. Bottom sheet, driven by the ride lifecycle state
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(28),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0x1F0F172A),
+                          blurRadius: 36,
+                          offset: Offset(0, -10),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const Spacer(),
-
-                // 3. Bottom sheet, driven by the ride lifecycle state
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(32),
+                      ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x1F0F172A),
-                        blurRadius: 36,
-                        offset: Offset(0, -10),
-                      ),
-                    ],
-                  ),
-                  child: BlocBuilder<RideBloc, RideState>(
-                    builder: (context, state) => AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      child: KeyedSubtree(
-                        key: ValueKey(state.runtimeType),
-                        child: switch (state) {
-                          RideSelecting() => RideSelectionPanel(state: state),
-                          RideIdle() => _IdleSheetBody(
-                              pickupAddress: _pickupAddress,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // iOS HIG grabber handle pill
+                        Center(
+                          child: Container(
+                            width: 36,
+                            height: 5,
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: AppColors.lineStrong,
+                              borderRadius: BorderRadius.circular(2.5),
                             ),
-                          _ => RideTrackingPanel(state: state),
-                        },
-                      ),
+                          ),
+                        ),
+                        BlocBuilder<RideBloc, RideState>(
+                          builder: (context, state) => AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            child: KeyedSubtree(
+                              key: ValueKey(state.runtimeType),
+                              child: switch (state) {
+                                RideSelecting() =>
+                                  RideSelectionPanel(state: state),
+                                RideIdle() => _IdleSheetBody(
+                                    pickupAddress: _pickupAddress,
+                                    onSelectDestination: (dest) =>
+                                        _selectDestination(context, dest),
+                                  ),
+                                _ => RideTrackingPanel(state: state),
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
-  }
-
-  void _selectDestination(BuildContext context, String destination) {
-    context.read<RideBloc>().add(
-          RideDestinationSelected(
-            pickup: _pickupAddress ?? 'Current location',
-            destination: destination,
-          ),
-        );
-  }
-
-  void _showNotificationNotice() {
-    // Keep prior behavior: notices are not wired in this slice.
-    // (Click target responds to satisfy a visible pressed state.)
   }
 }
 
 /// Idle sheet body: greeting, saved places, and the drivers note.
 class _IdleSheetBody extends StatelessWidget {
-  const _IdleSheetBody({this.pickupAddress});
+  const _IdleSheetBody({
+    this.pickupAddress,
+    required this.onSelectDestination,
+  });
 
   /// Reverse-geocoded address of the rider's GPS position, or null while
   /// the lookup has not resolved yet.
   final String? pickupAddress;
 
-  void _selectDestination(BuildContext context, String destination) {
-    context.read<RideBloc>().add(
-          RideDestinationSelected(
-            pickup: pickupAddress ?? 'Current location',
-            destination: destination,
-          ),
-        );
-  }
+  final void Function(String destination) onSelectDestination;
 
   @override
   Widget build(BuildContext context) {
@@ -377,7 +518,7 @@ class _IdleSheetBody extends StatelessWidget {
                 icon: Icons.home_rounded,
                 title: 'Home',
                 subtitle: 'Maple St 24 · 12 min',
-                onTap: () => _selectDestination(context, 'Maple St 24'),
+                onTap: () => onSelectDestination('Maple St 24'),
               ),
               const Divider(
                 height: 1,
@@ -388,16 +529,14 @@ class _IdleSheetBody extends StatelessWidget {
                 icon: Icons.work_rounded,
                 title: 'Work',
                 subtitle: '3rd Ave 88 · 24 min',
-                onTap: () => _selectDestination(context, '3rd Ave 88'),
+                onTap: () => onSelectDestination('3rd Ave 88'),
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
 
-        // Real-time pickup address resolved from the rider's GPS position,
-        // shown directly above the CTA so the shortest visual path reads
-        // "departing from X → set pickup".
+        // Real-time pickup address resolved from the rider's GPS position
         Row(
           children: [
             const Icon(
@@ -413,7 +552,7 @@ class _IdleSheetBody extends StatelessWidget {
                     : 'Locating your pickup address…',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textSecondary,
@@ -435,7 +574,7 @@ class _IdleSheetBody extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
               ),
             ),
-            onPressed: () => _selectDestination(context, 'Riverside Park'),
+            onPressed: () => onSelectDestination('Riverside Park'),
             child: const Text(
               'Set pickup location',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
