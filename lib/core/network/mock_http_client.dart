@@ -7,9 +7,16 @@ import '../constants/demo_account.dart';
 /// to `https://api.example.com` and provides realistic offline responses
 /// with realistic latency and error validation.
 class MockHttpClient extends http.BaseClient {
-  MockHttpClient({this.defaultDelay = const Duration(milliseconds: 600)});
+  MockHttpClient({
+    this.defaultDelay = const Duration(milliseconds: 600),
+    http.Client? innerClient,
+  }) : _inner = innerClient ?? http.Client();
 
   final Duration defaultDelay;
+
+  /// Real network delegate for hosts outside the mock surface, so calls
+  /// such as OpenStreetMap tiles and Nominatim pass through untouched.
+  final http.Client _inner;
 
   // In-memory registered user database for offline testing.
   // TODO(Slice 2 follow-up): replace with the real backend /api/v1/auth
@@ -26,6 +33,12 @@ class MockHttpClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    // Only the mock API surface is intercepted; everything else (OSM
+    // tiles, Nominatim, and future real fleets) goes to the real network.
+    if (request.url.host != 'api.example.com') {
+      return _inner.send(request);
+    }
+
     // Simulate real network trip
     if (defaultDelay > Duration.zero) {
       await Future<void>.delayed(defaultDelay);

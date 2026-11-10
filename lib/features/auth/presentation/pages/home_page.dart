@@ -38,8 +38,17 @@ class HomePage extends StatelessWidget {
   }
 }
 
-class _HomePageView extends StatelessWidget {
+class _HomePageView extends StatefulWidget {
   const _HomePageView();
+
+  @override
+  State<_HomePageView> createState() => _HomePageViewState();
+}
+
+class _HomePageViewState extends State<_HomePageView> {
+  /// Real-time pickup label resolved from the rider's GPS position via
+  /// reverse geocoding; null until the first lookup settles.
+  String? _pickupAddress;
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +67,19 @@ class _HomePageView extends StatelessWidget {
       body: Stack(
         children: [
           // 1. Real interactive OpenStreetMap background
-          const Positioned.fill(
-            child: OsmMapBackground(),
+          Positioned.fill(
+            child: OsmMapBackground(
+              // Real-time address: reverse-geocode GPS movement (throttled)
+              onPickupAddressResolved: (address) =>
+                  setState(() => _pickupAddress = address),
+              // Tap-to-pick destination with its resolved address
+              onPointSelected: (picked) => context.read<RideBloc>().add(
+                    RideDestinationSelected(
+                      pickup: _pickupAddress ?? 'Current location',
+                      destination: picked.address,
+                    ),
+                  ),
+            ),
           ),
 
           // 2. Safe Area floating UI elements
@@ -257,7 +277,9 @@ class _HomePageView extends StatelessWidget {
                         key: ValueKey(state.runtimeType),
                         child: switch (state) {
                           RideSelecting() => RideSelectionPanel(state: state),
-                          RideIdle() => const _IdleSheetBody(),
+                          RideIdle() => _IdleSheetBody(
+                              pickupAddress: _pickupAddress,
+                            ),
                           _ => RideTrackingPanel(state: state),
                         },
                       ),
@@ -275,7 +297,7 @@ class _HomePageView extends StatelessWidget {
   void _selectDestination(BuildContext context, String destination) {
     context.read<RideBloc>().add(
           RideDestinationSelected(
-            pickup: 'Current location',
+            pickup: _pickupAddress ?? 'Current location',
             destination: destination,
           ),
         );
@@ -289,12 +311,16 @@ class _HomePageView extends StatelessWidget {
 
 /// Idle sheet body: greeting, saved places, and the drivers note.
 class _IdleSheetBody extends StatelessWidget {
-  const _IdleSheetBody();
+  const _IdleSheetBody({this.pickupAddress});
+
+  /// Reverse-geocoded address of the rider's GPS position, or null while
+  /// the lookup has not resolved yet.
+  final String? pickupAddress;
 
   void _selectDestination(BuildContext context, String destination) {
     context.read<RideBloc>().add(
           RideDestinationSelected(
-            pickup: 'Current location',
+            pickup: pickupAddress ?? 'Current location',
             destination: destination,
           ),
         );
@@ -388,6 +414,34 @@ class _IdleSheetBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+
+        const SizedBox(height: 12),
+
+        // Real-time pickup address resolved from the rider's GPS position
+        Row(
+          children: [
+            const Icon(
+              Icons.near_me_rounded,
+              size: 16,
+              color: AppColors.accent,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                pickupAddress != null
+                    ? 'Departing from\n$pickupAddress'
+                    : 'Locating your pickup address…',
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
 
         // Drivers status note
         const Center(
